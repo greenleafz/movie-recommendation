@@ -6,11 +6,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 app = Flask(__name__)
 
 # Load the saved SVD matrix
-with open('./models/svd_matrix.pkl', 'rb') as f:
+with open('./app/models/svd_matrix.pkl', 'rb') as f:
     svd_matrix = pickle.load(f)
 
 # Load movie titles
-with open('./models/movie_titles.pkl', 'rb') as f:
+with open('./app/models/movie_titles.pkl', 'rb') as f:
     movie_titles = pickle.load(f)
 
 # Convert movie titles to a list if not already
