@@ -12,3 +12,7 @@ __pycache__/
 # Other environments
 .env
 .venv
+
+# Ignore data and model files
+data/
+app/models/*.pkl
