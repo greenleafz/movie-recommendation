@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personalized Recommendations for User {{ user_id }}</title>
+</head>
+<body>
+    <h1>Personalized Recommendations for User {{ user_id }}</h1>
+    
+    <h3>Movies They Liked:</h3>
+    <ul>
+        {% for movie in liked_movies %}
+        <li>{{ movie }}</li>
+        {% endfor %}
+    </ul>
+    
+    <h3>Movies They Didn't Like:</h3>
+    <ul>
+        {% for movie in disliked_movies %}
+        <li>{{ movie }}</li>
+        {% endfor %}
+    </ul>
+    
+    <h3>Recommended Movies They Might Like:</h3>
+    <ul>
+        {% for movie in recommendations %}
+        <li>{{ movie }}</li>
+        {% endfor %}
+    </ul>
+    
+    <a href="/">Back to Home</a>
+</body>
+</html>

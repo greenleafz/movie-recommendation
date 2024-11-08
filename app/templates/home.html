@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Movie Recommender</title>
 </head>
 <body>
-    <h1>Welcome to the Movie Recommender System</h1>
+    <h1>Welcome to the Movie Recommender</h1>
+    
+    <h2>Find Similar Movies (SVD-based Recommendations)</h2>
     <form action="/recommend" method="post">
         <label for="movie_name">Choose a movie:</label>
         <select name="movie_name" required>
@@ -13,10 +16,27 @@
             {% endfor %}
         </select>
         <br><br>
-        <label for="num_recommendations">Number of recommendations:</label>
+        <label for="num_recommendations">Number of Recommendations:</label>
         <input type="number" name="num_recommendations" min="1" max="20" value="5">
         <br><br>
-        <input type="submit" value="Get Recommendations">
+        <input type="submit" value="Get Similar Movies">
+    </form>
+    
+    <hr>
+    
+    <h2>Get Personalized Recommendations (NCF-based)</h2>
+    <form action="/personalized_recommend" method="post">
+        <label for="user_id">Select a User ID:</label>
+        <select name="user_id" required>
+            {% for uid in user_ids %}
+            <option value="{{ uid }}">{{ uid }}</option>
+            {% endfor %}
+        </select>
+        <br><br>
+        <label for="num_recommendations">Number of Recommendations:</label>
+        <input type="number" name="num_recommendations" min="1" max="20" value="10">
+        <br><br>
+        <input type="submit" value="Get Personalized Recommendations">
     </form>
 </body>
 </html>

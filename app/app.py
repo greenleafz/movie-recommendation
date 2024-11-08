@@ -1,15 +1,18 @@
 from flask import Flask, render_template, request
 import pickle
 import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+import random
+import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 
-# Load the saved SVD matrix
+# Load the SVD matrix and movie titles for SVD recommendations
 with open('./app/models/svd_matrix.pkl', 'rb') as f:
     svd_matrix = pickle.load(f)
 
-# Load movie titles
 with open('./app/models/movie_titles.pkl', 'rb') as f:
     movie_titles = pickle.load(f)
 
@@ -20,10 +23,38 @@ if isinstance(movie_titles, np.ndarray):
 # Create a mapping from movie titles to indices
 movie_indices = {title: idx for idx, title in enumerate(movie_titles)}
 
+# Load the NCF model and necessary data for personalized recommendations
+ncf_model = keras.models.load_model('./app/models/ncf_model.h5')
+
+with open('./app/models/user_id_to_idx.pkl', 'rb') as f:
+    user_id_to_idx = pickle.load(f)
+
+with open('./app/models/item_ids.pkl', 'rb') as f:
+    item_ids = pickle.load(f)
+
+with open('./app/models/item_id_to_title.pkl', 'rb') as f:
+    item_id_to_title = pickle.load(f)
+
+with open('./app/models/user_ids.pkl', 'rb') as f:
+    user_ids = pickle.load(f)
+
+data = pd.read_pickle('./app/models/data.pkl')
+
+# Reverse mapping from item_idx to item_id
+item_idx_to_id = {idx: item_id for idx, item_id in enumerate(item_ids)}
+
+# Get number of users and items
+num_users = len(user_ids)
+num_items = len(item_ids)
+
+# Home route
 @app.route('/')
 def home():
-    return render_template('home.html', movies=movie_titles)
+    # Display a limited number of user IDs for practicality
+    display_user_ids = user_ids[:100]
+    return render_template('home.html', movies=movie_titles, user_ids=display_user_ids)
 
+# Route for SVD-based movie recommendations
 @app.route('/recommend', methods=['POST'])
 def recommend():
     selected_movie = request.form['movie_name']
@@ -37,6 +68,7 @@ def recommend():
     recommendations = get_similar_movies_svd(selected_movie, num_recommendations)
     return render_template('recommendations.html', movie_name=selected_movie, recommendations=recommendations)
 
+# SVD-based recommendation function
 def get_similar_movies_svd(movie_name, num_movies=5):
     # Find the index of the movie
     movie_idx = movie_indices[movie_name]
@@ -54,6 +86,73 @@ def get_similar_movies_svd(movie_name, num_movies=5):
     similar_movies = [movie_titles[i] for i in similar_indices]
 
     return similar_movies
+
+# Route for NCF-based personalized recommendations
+@app.route('/personalized_recommend', methods=['POST'])
+def personalized_recommend():
+    selected_user_id = int(request.form['user_id'])
+    num_recommendations = int(request.form.get('num_recommendations', 10))
+    
+    liked_movies = get_liked_movies(selected_user_id, num_movies=5)
+    disliked_movies = get_disliked_movies(selected_user_id, num_movies=5)
+    recommendations = recommend_movies(selected_user_id, num_recommendations)
+    
+    return render_template(
+        'personalized_recommendations.html',
+        user_id=selected_user_id,
+        liked_movies=liked_movies,
+        disliked_movies=disliked_movies,
+        recommendations=recommendations
+    )
+
+# Function to get movies a user liked
+def get_liked_movies(user_id, num_movies=10):
+    user_data = data[(data['user_id'] == user_id) & (data['rating'] >= 4)]
+    liked_movies = user_data['title'].tolist()
+    if num_movies > len(liked_movies):
+        num_movies = len(liked_movies)
+    liked_movies = random.sample(liked_movies, num_movies)
+    return liked_movies
+
+# Function to get movies a user disliked
+def get_disliked_movies(user_id, num_movies=10):
+    user_data = data[(data['user_id'] == user_id) & (data['rating'] <= 2)]
+    disliked_movies = user_data['title'].tolist()
+    if num_movies > len(disliked_movies):
+        num_movies = len(disliked_movies)
+    disliked_movies = random.sample(disliked_movies, num_movies)
+    return disliked_movies
+
+# NCF-based recommendation function
+def recommend_movies(user_id, num_recommendations=10):
+    user_idx = user_id_to_idx.get(user_id)
+    if user_idx is None:
+        print("User ID not found.")
+        return []
+    
+    # Items the user has interacted with
+    user_data = data[data['user_idx'] == user_idx]
+    interacted_items = set(user_data['item_idx'].tolist())
+    
+    # Items not yet interacted with
+    all_items = set(range(num_items))
+    items_to_predict = list(all_items - interacted_items)
+    
+    # Predict interaction scores
+    user_array = np.full(len(items_to_predict), user_idx)
+    item_array = np.array(items_to_predict)
+    
+    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+    
+    # Get top N items
+    top_indices = predictions.argsort()[-num_recommendations:][::-1]
+    recommended_item_idxs = [items_to_predict[i] for i in top_indices]
+    
+    # Map item indices to titles
+    recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
+    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+    
+    return recommended_titles
 
 if __name__ == '__main__':
     app.run(debug=True)

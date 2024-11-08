@@ -1,19 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Recommendations</title>
+    <meta charset="UTF-8">
+    <title>Recommendations for {{ movie_name }}</title>
 </head>
 <body>
+    <h1>Recommendations for "{{ movie_name }}"</h1>
+    
     {% if error_message %}
-    <h2>{{ error_message }}</h2>
+        <p>{{ error_message }}</p>
     {% else %}
-    <h2>Movies similar to "{{ movie_name }}":</h2>
-    <ul>
-        {% for movie in recommendations %}
-        <li>{{ movie }}</li>
-        {% endfor %}
-    </ul>
+        <ul>
+            {% for movie in recommendations %}
+            <li>{{ movie }}</li>
+            {% endfor %}
+        </ul>
     {% endif %}
+    
     <a href="/">Back to Home</a>
 </body>
 </html>
