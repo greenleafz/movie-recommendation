@@ -68,6 +68,21 @@ def recommend():
     recommendations = get_similar_movies_svd(selected_movie, num_recommendations)
     return render_template('recommendations.html', movie_name=selected_movie, recommendations=recommendations)
 
+@app.route('/similar_movies/<movie_name>')
+def similar_movies(movie_name):
+    num_recommendations = 5  # Number of similar movies to show
+    
+    # Check if the movie exists in the indices
+    if movie_name not in movie_indices:
+        error_message = "Movie not found in the database."
+        return render_template('recommendations.html', error_message=error_message)
+    
+    # Get similar movies
+    recommendations = get_similar_movies_svd(movie_name, num_recommendations)
+    
+    return render_template('similar_movies.html', movie_name=movie_name, recommendations=recommendations)
+
+
 # SVD-based recommendation function
 def get_similar_movies_svd(movie_name, num_movies=5):
     # Find the index of the movie
@@ -153,6 +168,8 @@ def recommend_movies(user_id, num_recommendations=10):
     recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
     
     return recommended_titles
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

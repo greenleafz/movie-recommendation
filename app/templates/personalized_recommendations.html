@@ -10,21 +10,21 @@
     <h3>Movies They Liked:</h3>
     <ul>
         {% for movie in liked_movies %}
-        <li>{{ movie }}</li>
+        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
         {% endfor %}
     </ul>
     
     <h3>Movies They Didn't Like:</h3>
     <ul>
         {% for movie in disliked_movies %}
-        <li>{{ movie }}</li>
+        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
         {% endfor %}
     </ul>
     
     <h3>Recommended Movies They Might Like:</h3>
     <ul>
         {% for movie in recommendations %}
-        <li>{{ movie }}</li>
+        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
         {% endfor %}
     </ul>
     
