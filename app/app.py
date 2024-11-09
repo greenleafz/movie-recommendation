@@ -310,7 +310,7 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     user_array = np.full(len(items_to_predict), user_idx)
     item_array = np.array(items_to_predict)
 
-    predictions = ncf_model.predict([user_array, item_array], batch_size=128).flatten()
+    predictions = ncf_model.predict([user_array, item_array], batch_size=32).flatten()
 
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
