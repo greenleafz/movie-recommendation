@@ -116,11 +116,11 @@ def rate_movies():
         for key, value in request.form.items():
             if key.startswith('movie_'):
                 movie_title = key.replace('movie_', '')
-                rating = int(value)
-                session['rated_movies'][movie_title] = rating
+                if value:  # Check if a rating was provided
+                    rating = int(value)
+                    session['rated_movies'][movie_title] = rating
                 if movie_title not in session['seen_movies']:
                     session['seen_movies'].append(movie_title)
-
 
         # Check if 'done' button was clicked
         if 'done' in request.form:

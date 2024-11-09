@@ -3,6 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <title>Rate Movies</title>
+    <style>
+        .star-rating {
+            direction: rtl;
+            font-size: 1.5em;
+            unicode-bidi: bidi-override;
+            display: inline-block;
+        }
+        .star-rating input[type="radio"] {
+            display: none;
+        }
+        .star-rating label {
+            color: #ddd;
+            cursor: pointer;
+        }
+        .star-rating label:before {
+            content: "★";
+        }
+        .star-rating input[type="radio"]:checked ~ label {
+            color: gold;
+        }
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: gold;
+        }
+    </style>
 </head>
 <body>
     <h1>Rate Movies</h1>
@@ -20,14 +45,18 @@
             <tr>
                 <td>{{ movie }}</td>
                 <td>
-                    <select name="movie_{{ movie }}" required>
-                        <option value="" disabled selected>Select rating</option>
-                        <option value="1">1 - Poor</option>
-                        <option value="2">2 - Fair</option>
-                        <option value="3">3 - Good</option>
-                        <option value="4">4 - Very Good</option>
-                        <option value="5">5 - Excellent</option>
-                    </select>
+                    <div class="star-rating">
+                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_5" value="5">
+                        <label for="movie_{{ loop.index }}_rating_5"></label>
+                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_4" value="4">
+                        <label for="movie_{{ loop.index }}_rating_4"></label>
+                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_3" value="3">
+                        <label for="movie_{{ loop.index }}_rating_3"></label>
+                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_2" value="2">
+                        <label for="movie_{{ loop.index }}_rating_2"></label>
+                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_1" value="1">
+                        <label for="movie_{{ loop.index }}_rating_1"></label>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
