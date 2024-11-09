@@ -7,9 +7,20 @@ import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import os
+from flask_session import Session
+import redis
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY')
+
+# Load the secret key from an environment variable or set a default
+app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
+
+# Configure server-side sessions with Redis
+app.config['SESSION_TYPE'] = 'redis'
+app.config['SESSION_REDIS'] = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:6379'))
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+Session(app)
 
 # Load the SVD matrix and movie titles for SVD recommendations
 with open('./app/models/svd_matrix.pkl', 'rb') as f:
@@ -120,14 +131,19 @@ def rate_movies():
                 movie_title = key.replace('movie_', '')
                 if value:  # Check if a rating was provided
                     rating = int(value)
-                    session['rated_movies'][movie_title] = rating
-                if movie_title not in session['seen_movies']:
-                    session['seen_movies'].append(movie_title)
+                    rated_movies = session.get('rated_movies', {})
+                    rated_movies[movie_title] = rating
+                    session['rated_movies'] = rated_movies
+
+                    seen_movies = session.get('seen_movies', [])
+                    if movie_title not in seen_movies:
+                        seen_movies.append(movie_title)
+                        session['seen_movies'] = seen_movies
 
         # Determine which button was clicked
         action = request.form.get('action')
         if action == 'done':
-            if len(session['rated_movies']) >= 5:
+            if len(session.get('rated_movies', {})) >= 5:
                 # Generate recommendations
                 recommendations = generate_recommendations_from_ratings(session['rated_movies'])
                 return render_template('session_recommendations.html', recommendations=recommendations)
@@ -136,12 +152,12 @@ def rate_movies():
                 # Instead of changing pages, render the same page with an error message
 
     # Select movies to rate
-    rated_movie_titles = session['seen_movies']
+    rated_movie_titles = session.get('seen_movies', [])
     movies_to_rate = select_movies_for_rating(rated_movie_titles)
 
     # If no more movies to rate
     if not movies_to_rate:
-        if len(session['rated_movies']) >= 5:
+        if len(session.get('rated_movies', {})) >= 5:
             # Generate recommendations
             recommendations = generate_recommendations_from_ratings(session['rated_movies'])
             return render_template('session_recommendations.html', recommendations=recommendations)
@@ -229,7 +245,9 @@ def recommend_movies(user_id, num_recommendations=10):
     return recommended_titles
 
 # Function to select movies for rating, influenced by previous ratings
-def select_movies_for_rating(rated_movie_titles):
+def select_movies_for_rating(rated_movie_titles=None):
+    if rated_movie_titles is None:
+        rated_movie_titles = []
     # Exclude movies already rated
     available_movie_indices = [idx for idx in range(len(movie_titles)) if movie_titles[idx] not in rated_movie_titles]
 
@@ -238,7 +256,7 @@ def select_movies_for_rating(rated_movie_titles):
         selected_indices = available_movie_indices
     else:
         # If user has rated movies, select new movies based on similarities
-        if session['rated_movies']:
+        if session.get('rated_movies'):
             rated_movies = list(session['rated_movies'].keys())
             # Get indices of rated movies
             rated_movie_indices = [movie_indices[movie] for movie in rated_movies if movie in movie_indices]
@@ -284,31 +302,30 @@ def select_movies_for_rating(rated_movie_titles):
 
 # Function to generate recommendations from user ratings
 def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
-    # Create a DataFrame from user_ratings
-    user_ratings_df = pd.DataFrame({
-        'user_id': [9999]*len(user_ratings),  # Use a unique user_id for the session
-        'item_id': [item_ids[item_id_to_idx.get(movie_indices[movie])] for movie in user_ratings.keys() if movie in movie_indices],
-        'rating': list(user_ratings.values()),
-    })
-    user_idx = 0  # Use default user_idx 0
-    user_ratings_df['user_idx'] = user_idx
-    user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys() if movie in movie_indices]
-    user_ratings_df['title'] = user_ratings_df['item_id'].map(item_id_to_title)
+    # Assign a new user index for the session user
+    session_user_idx = num_users  # Use an index beyond existing users
 
-    # Filter out invalid indices for items
-    user_ratings_df = user_ratings_df[user_ratings_df['item_idx'] < num_items]
+    # Prepare item indices and ratings
+    item_idxs = []
+    ratings = []
+    for movie_title, rating in user_ratings.items():
+        if movie_title in movie_indices:
+            movie_idx = movie_indices[movie_title]
+            item_idxs.append(movie_idx)
+            ratings.append(rating)
 
     # Items the user has interacted with
-    interacted_items = set(user_ratings_df['item_idx'].tolist())
+    interacted_items = set(item_idxs)
 
     # Items not yet interacted with
     all_items = set(range(num_items))
     items_to_predict = list(all_items - interacted_items)
 
     # Predict interaction scores
-    user_array = np.full(len(items_to_predict), user_idx)
+    user_array = np.full(len(items_to_predict), session_user_idx)
     item_array = np.array(items_to_predict)
 
+    # Predict
     predictions = ncf_model.predict([user_array, item_array], batch_size=32).flatten()
 
     # Get top N items
@@ -316,8 +333,7 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     recommended_item_idxs = [items_to_predict[i] for i in top_indices]
 
     # Map item indices to titles
-    recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
-    recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
+    recommended_titles = [movie_titles[idx] for idx in recommended_item_idxs]
 
     return recommended_titles
 
