@@ -283,12 +283,15 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     # Create a DataFrame from user_ratings
     user_ratings_df = pd.DataFrame({
         'user_id': [9999]*len(user_ratings),  # Use a unique user_id for the session
-        'item_id': [item_ids[item_id_to_idx.get(movie_indices[movie])] for movie in user_ratings.keys()],
+        'item_id': [item_ids[item_id_to_idx.get(movie_indices[movie])] for movie in user_ratings.keys() if movie in movie_indices],
         'rating': list(user_ratings.values()),
     })
     user_ratings_df['user_idx'] = len(user_id_to_idx)  # New index for the new user
-    user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys()]
+    user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys() if movie in movie_indices]
     user_ratings_df['title'] = user_ratings_df['item_id'].map(item_id_to_title)
+
+    # Filter out invalid indices for items and users
+    user_ratings_df = user_ratings_df[(user_ratings_df['item_idx'] < num_items) & (user_ratings_df['user_idx'] < num_users)]
 
     # Combine with existing data
     combined_data = pd.concat([data, user_ratings_df], ignore_index=True)
@@ -303,11 +306,11 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     all_items = set(range(num_items))
     items_to_predict = list(all_items - interacted_items)
 
-    # Predict interaction scores
+    # Predict interaction scores, ensuring valid indices
     user_array = np.full(len(items_to_predict), user_idx)
     item_array = np.array(items_to_predict)
 
-    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+    predictions = ncf_model.predict([user_array, item_array], batch_size=128).flatten()
 
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
@@ -315,9 +318,10 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
 
     # Map item indices to titles
     recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
-    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+    recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
 
     return recommended_titles
+
 
 if __name__ == '__main__':
     app.run(debug=True)
