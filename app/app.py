@@ -224,17 +224,6 @@ def recommend_movies(user_id, num_recommendations=10):
 
     return recommended_titles
 
-
-# Function to get similar movie indices
-def get_similar_movie_indices(movie_name):
-    if movie_name not in movie_indices:
-        return []
-    movie_idx = movie_indices[movie_name]
-    movie_vec = svd_matrix[movie_idx].reshape(1, -1)
-    cosine_sim = cosine_similarity(movie_vec, svd_matrix)[0]
-    similar_indices = np.argsort(cosine_sim)[::-1]
-    return similar_indices
-
 # Function to select movies for rating
 def select_movies_for_rating(rated_movie_titles):
     # Exclude movies already rated
@@ -286,18 +275,13 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
         'item_id': [item_ids[item_id_to_idx.get(movie_indices[movie])] for movie in user_ratings.keys() if movie in movie_indices],
         'rating': list(user_ratings.values()),
     })
-    user_ratings_df['user_idx'] = len(user_id_to_idx)  # New index for the new user
+    user_idx = 0  # Use default user_idx 0
+    user_ratings_df['user_idx'] = user_idx
     user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys() if movie in movie_indices]
     user_ratings_df['title'] = user_ratings_df['item_id'].map(item_id_to_title)
 
-    # Filter out invalid indices for items and users
-    user_ratings_df = user_ratings_df[(user_ratings_df['item_idx'] < num_items) & (user_ratings_df['user_idx'] < num_users)]
-
-    # Combine with existing data
-    combined_data = pd.concat([data, user_ratings_df], ignore_index=True)
-
-    # Generate recommendations
-    user_idx = len(user_id_to_idx)  # Index for the new user
+    # Filter out invalid indices for items
+    user_ratings_df = user_ratings_df[user_ratings_df['item_idx'] < num_items]
 
     # Items the user has interacted with
     interacted_items = set(user_ratings_df['item_idx'].tolist())
@@ -306,13 +290,9 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     all_items = set(range(num_items))
     items_to_predict = list(all_items - interacted_items)
 
-    # Predict interaction scores, ensuring valid indices
+    # Predict interaction scores
     user_array = np.full(len(items_to_predict), user_idx)
     item_array = np.array(items_to_predict)
-
-    # Filter valid indices
-    user_array = np.array([idx for idx in user_array if idx < num_users])
-    item_array = np.array([idx for idx in item_array if idx < num_items])
 
     predictions = ncf_model.predict([user_array, item_array], batch_size=32).flatten()
 
@@ -325,7 +305,6 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
 
     return recommended_titles
-
 
 if __name__ == '__main__':
     app.run(debug=True)
