@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>Rate Movies</title>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
         .star-rating {
             direction: rtl;
             font-size: 1.5em;
@@ -16,9 +20,7 @@
         .star-rating label {
             color: #ddd;
             cursor: pointer;
-        }
-        .star-rating label:before {
-            content: "★";
+            padding: 0 5px;
         }
         .star-rating input[type="radio"]:checked ~ label,
         .star-rating label:hover,
@@ -28,13 +30,15 @@
         .error {
             color: red;
             margin-top: 10px;
+            font-weight: bold;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
         th, td {
-            padding: 8px 12px;
+            padding: 10px 15px;
             border-bottom: 1px solid #ddd;
             text-align: left;
         }
@@ -49,16 +53,51 @@
             font-size: 1em;
             margin-right: 10px;
             cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+        }
+        .navigation-buttons button:hover {
+            background-color: #0056b3;
+        }
+        .links {
+            margin-top: 30px;
+        }
+        .links a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #007BFF;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .progress {
+            margin-top: 10px;
+            font-size: 1em;
         }
     </style>
 </head>
 <body>
     <h1>Rate Movies</h1>
     
+    <!-- Progress Indicator -->
+    {% if session['rated_movies'] %}
+        <div class="progress">
+            You have rated {{ session['rated_movies']|length }} out of 5 required movies.
+        </div>
+    {% else %}
+        <div class="progress">
+            You have rated 0 out of 5 required movies.
+        </div>
+    {% endif %}
+    
+    <!-- Error Message -->
     {% if error_message %}
         <p class="error">{{ error_message }}</p>
     {% endif %}
     
+    <!-- Movie Rating Form -->
     {% if movies %}
         <form method="post">
             <table>
@@ -72,19 +111,19 @@
                     <td>
                         <div class="star-rating">
                             <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_5" value="5">
-                            <label for="movie_{{ loop.index }}_rating_5"></label>
+                            <label for="movie_{{ loop.index }}_rating_5" title="5 stars">&#9733;</label>
                             
                             <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_4" value="4">
-                            <label for="movie_{{ loop.index }}_rating_4"></label>
+                            <label for="movie_{{ loop.index }}_rating_4" title="4 stars">&#9733;</label>
                             
                             <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_3" value="3">
-                            <label for="movie_{{ loop.index }}_rating_3"></label>
+                            <label for="movie_{{ loop.index }}_rating_3" title="3 stars">&#9733;</label>
                             
                             <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_2" value="2">
-                            <label for="movie_{{ loop.index }}_rating_2"></label>
+                            <label for="movie_{{ loop.index }}_rating_2" title="2 stars">&#9733;</label>
                             
                             <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_1" value="1">
-                            <label for="movie_{{ loop.index }}_rating_1"></label>
+                            <label for="movie_{{ loop.index }}_rating_1" title="1 star">&#9733;</label>
                         </div>
                     </td>
                 </tr>
@@ -100,7 +139,8 @@
         <p>No more movies to rate.</p>
     {% endif %}
     
-    <br>
-    <a href="{{ url_for('reset_ratings') }}">Reset Ratings</a> | <a href="/">Back to Home</a>
+    <div class="links">
+        <a href="{{ url_for('reset_ratings') }}">Reset Ratings</a> | <a href="/">Back to Home</a>
+    </div>
 </body>
 </html>
