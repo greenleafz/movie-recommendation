@@ -15,8 +15,12 @@ app = Flask(__name__)
 # Load the secret key from an environment variable or set a default
 app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
 
-# Configure the database URI
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
+# Adjust DATABASE_URL to be compatible with SQLAlchemy
+uri = os.environ.get("DATABASE_URL", "sqlite:///local.db")  # Get the database URL from environment
+if uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configure session to use the database
