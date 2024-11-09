@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rate Movies</title>
+</head>
+<body>
+    <h1>Rate Movies</h1>
+    {% if error_message %}
+        <p style="color: red;">{{ error_message }}</p>
+    {% endif %}
+    {% if movies %}
+    <form method="post">
+        <table>
+            <tr>
+                <th>Movie</th>
+                <th>Rating</th>
+            </tr>
+            {% for movie in movies %}
+            <tr>
+                <td>{{ movie }}</td>
+                <td>
+                    <select name="movie_{{ movie }}" required>
+                        <option value="" disabled selected>Select rating</option>
+                        <option value="1">1 - Poor</option>
+                        <option value="2">2 - Fair</option>
+                        <option value="3">3 - Good</option>
+                        <option value="4">4 - Very Good</option>
+                        <option value="5">5 - Excellent</option>
+                    </select>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        <br>
+        <button type="submit" name="next">Next</button>
+        <button type="submit" name="done">Done</button>
+    </form>
+    {% else %}
+        <p>No more movies to rate.</p>
+    {% endif %}
+    <br>
+    <a href="{{ url_for('reset_ratings') }}">Reset Ratings</a> | <a href="/">Back to Home</a>
+</body>
+</html>

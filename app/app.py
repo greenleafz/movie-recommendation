@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, session
 import pickle
 import numpy as np
 import tensorflow as tf
@@ -6,8 +6,10 @@ from tensorflow import keras
 import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)  # Generate secret key programmatically
 
 # Load the SVD matrix and movie titles for SVD recommendations
 with open('./app/models/svd_matrix.pkl', 'rb') as f:
@@ -43,6 +45,9 @@ data = pd.read_pickle('./app/models/data.pkl')
 # Reverse mapping from item_idx to item_id
 item_idx_to_id = {idx: item_id for idx, item_id in enumerate(item_ids)}
 
+# Create item_id_to_idx mapping
+item_id_to_idx = {item_id: idx for idx, item_id in enumerate(item_ids)}
+
 # Get number of users and items
 num_users = len(user_ids)
 num_items = len(item_ids)
@@ -50,9 +55,7 @@ num_items = len(item_ids)
 # Home route
 @app.route('/')
 def home():
-    # Display a limited number of user IDs for practicality
-    display_user_ids = user_ids[:100]
-    return render_template('home.html', movies=movie_titles, user_ids=display_user_ids)
+    return render_template('home.html', movies=movie_titles, user_ids=user_ids[:100])
 
 # Route for SVD-based movie recommendations
 @app.route('/recommend', methods=['POST'])
@@ -68,20 +71,87 @@ def recommend():
     recommendations = get_similar_movies_svd(selected_movie, num_recommendations)
     return render_template('recommendations.html', movie_name=selected_movie, recommendations=recommendations)
 
+# Route for similar movies
 @app.route('/similar_movies/<movie_name>')
 def similar_movies(movie_name):
     num_recommendations = 5  # Number of similar movies to show
-    
+
     # Check if the movie exists in the indices
     if movie_name not in movie_indices:
         error_message = "Movie not found in the database."
         return render_template('recommendations.html', error_message=error_message)
-    
+
     # Get similar movies
     recommendations = get_similar_movies_svd(movie_name, num_recommendations)
-    
+
     return render_template('similar_movies.html', movie_name=movie_name, recommendations=recommendations)
 
+# Route for NCF-based personalized recommendations
+@app.route('/personalized_recommend', methods=['POST'])
+def personalized_recommend():
+    selected_user_id = int(request.form['user_id'])
+    num_recommendations = int(request.form.get('num_recommendations', 10))
+
+    liked_movies = get_liked_movies(selected_user_id, num_movies=5)
+    disliked_movies = get_disliked_movies(selected_user_id, num_movies=5)
+    recommendations = recommend_movies(selected_user_id, num_recommendations)
+
+    return render_template(
+        'personalized_recommendations.html',
+        user_id=selected_user_id,
+        liked_movies=liked_movies,
+        disliked_movies=disliked_movies,
+        recommendations=recommendations
+    )
+
+# Route to start rating movies
+@app.route('/rate_movies', methods=['GET', 'POST'])
+def rate_movies():
+    if 'rated_movies' not in session:
+        session['rated_movies'] = {}
+        session['seen_movies'] = set()
+
+    if request.method == 'POST':
+        # Retrieve ratings from form
+        for key, value in request.form.items():
+            if key.startswith('movie_'):
+                movie_title = key.replace('movie_', '')
+                rating = int(value)
+                session['rated_movies'][movie_title] = rating
+                session['seen_movies'].add(movie_title)
+
+        # Check if 'done' button was clicked
+        if 'done' in request.form:
+            if len(session['rated_movies']) >= 5:
+                # Generate recommendations
+                recommendations = generate_recommendations_from_ratings(session['rated_movies'])
+                return render_template('session_recommendations.html', recommendations=recommendations)
+            else:
+                error_message = "Please rate at least 5 movies before proceeding."
+                return render_template('rate_movies.html', movies=[], error_message=error_message)
+
+    # Select movies to rate
+    rated_movie_titles = session['seen_movies']
+    movies_to_rate = select_movies_for_rating(rated_movie_titles)
+
+    # If no more movies to rate
+    if not movies_to_rate:
+        if len(session['rated_movies']) >= 5:
+            # Generate recommendations
+            recommendations = generate_recommendations_from_ratings(session['rated_movies'])
+            return render_template('session_recommendations.html', recommendations=recommendations)
+        else:
+            error_message = "No more movies to rate. Please rate at least 5 movies."
+            return render_template('rate_movies.html', movies=[], error_message=error_message)
+
+    return render_template('rate_movies.html', movies=movies_to_rate, error_message=None)
+
+# Route to reset ratings
+@app.route('/reset_ratings')
+def reset_ratings():
+    session.pop('rated_movies', None)
+    session.pop('seen_movies', None)
+    return redirect(url_for('rate_movies'))
 
 # SVD-based recommendation function
 def get_similar_movies_svd(movie_name, num_movies=5):
@@ -102,24 +172,6 @@ def get_similar_movies_svd(movie_name, num_movies=5):
 
     return similar_movies
 
-# Route for NCF-based personalized recommendations
-@app.route('/personalized_recommend', methods=['POST'])
-def personalized_recommend():
-    selected_user_id = int(request.form['user_id'])
-    num_recommendations = int(request.form.get('num_recommendations', 10))
-    
-    liked_movies = get_liked_movies(selected_user_id, num_movies=5)
-    disliked_movies = get_disliked_movies(selected_user_id, num_movies=5)
-    recommendations = recommend_movies(selected_user_id, num_recommendations)
-    
-    return render_template(
-        'personalized_recommendations.html',
-        user_id=selected_user_id,
-        liked_movies=liked_movies,
-        disliked_movies=disliked_movies,
-        recommendations=recommendations
-    )
-
 # Function to get movies a user liked
 def get_liked_movies(user_id, num_movies=10):
     user_data = data[(data['user_id'] == user_id) & (data['rating'] >= 4)]
@@ -138,38 +190,130 @@ def get_disliked_movies(user_id, num_movies=10):
     disliked_movies = random.sample(disliked_movies, num_movies)
     return disliked_movies
 
-# NCF-based recommendation function
+# NCF-based recommendation function for existing users
 def recommend_movies(user_id, num_recommendations=10):
     user_idx = user_id_to_idx.get(user_id)
     if user_idx is None:
         print("User ID not found.")
         return []
-    
+
     # Items the user has interacted with
     user_data = data[data['user_idx'] == user_idx]
     interacted_items = set(user_data['item_idx'].tolist())
-    
+
     # Items not yet interacted with
     all_items = set(range(num_items))
     items_to_predict = list(all_items - interacted_items)
-    
+
     # Predict interaction scores
     user_array = np.full(len(items_to_predict), user_idx)
     item_array = np.array(items_to_predict)
-    
+
     predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
-    
+
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
     recommended_item_idxs = [items_to_predict[i] for i in top_indices]
-    
+
     # Map item indices to titles
     recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
     recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
-    
+
     return recommended_titles
 
+# Function to get similar movie indices
+def get_similar_movie_indices(movie_name):
+    if movie_name not in movie_indices:
+        return []
+    movie_idx = movie_indices[movie_name]
+    movie_vec = svd_matrix[movie_idx].reshape(1, -1)
+    cosine_sim = cosine_similarity(movie_vec, svd_matrix)[0]
+    similar_indices = np.argsort(cosine_sim)[::-1]
+    return similar_indices
 
+# Function to select movies for rating
+def select_movies_for_rating(rated_movie_titles):
+    # Exclude movies already rated
+    available_movie_indices = [idx for idx in range(len(movie_titles)) if movie_titles[idx] not in rated_movie_titles]
+
+    # If less than 5 movies are left, return them all
+    if len(available_movie_indices) <= 5:
+        selected_indices = available_movie_indices
+    else:
+        # Randomly select movies based on specified criteria
+        selected_indices = []
+
+        # First movie: from top 25 movies
+        first_movie_idx = random.choice(available_movie_indices[:25])
+        selected_indices.append(first_movie_idx)
+
+        # Second movie: from 25-50
+        second_movie_idx = random.choice(available_movie_indices[25:50])
+        selected_indices.append(second_movie_idx)
+
+        # Third movie: from 50-100
+        third_movie_idx = random.choice(available_movie_indices[50:100])
+        selected_indices.append(third_movie_idx)
+
+        # Fourth movie: from 100-500
+        if len(available_movie_indices) >= 500:
+            fourth_movie_idx = random.choice(available_movie_indices[100:500])
+        else:
+            fourth_movie_idx = random.choice(available_movie_indices[100:])
+        selected_indices.append(fourth_movie_idx)
+
+        # Fifth movie: from the 100 most dissimilar movies
+        fifth_movie_idx = random.choice(available_movie_indices[-100:])
+        selected_indices.append(fifth_movie_idx)
+
+        # Shuffle the selected movies
+        random.shuffle(selected_indices)
+
+    # Get movie titles
+    selected_movies = [movie_titles[idx] for idx in selected_indices]
+
+    return selected_movies
+
+# Function to generate recommendations from user ratings
+def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
+    # Create a DataFrame from user_ratings
+    user_ratings_df = pd.DataFrame({
+        'user_id': [9999]*len(user_ratings),  # Use a unique user_id for the session
+        'item_id': [item_ids[item_id_to_idx.get(movie_indices[movie])] for movie in user_ratings.keys()],
+        'rating': list(user_ratings.values()),
+    })
+    user_ratings_df['user_idx'] = len(user_id_to_idx)  # New index for the new user
+    user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys()]
+    user_ratings_df['title'] = user_ratings_df['item_id'].map(item_id_to_title)
+
+    # Combine with existing data
+    combined_data = pd.concat([data, user_ratings_df], ignore_index=True)
+
+    # Generate recommendations
+    user_idx = len(user_id_to_idx)  # Index for the new user
+
+    # Items the user has interacted with
+    interacted_items = set(user_ratings_df['item_idx'].tolist())
+
+    # Items not yet interacted with
+    all_items = set(range(num_items))
+    items_to_predict = list(all_items - interacted_items)
+
+    # Predict interaction scores
+    user_array = np.full(len(items_to_predict), user_idx)
+    item_array = np.array(items_to_predict)
+
+    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+
+    # Get top N items
+    top_indices = predictions.argsort()[-num_recommendations:][::-1]
+    recommended_item_idxs = [items_to_predict[i] for i in top_indices]
+
+    # Map item indices to titles
+    recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
+    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+
+    return recommended_titles
 
 if __name__ == '__main__':
     app.run(debug=True)

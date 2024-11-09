@@ -7,6 +7,11 @@
 <body>
     <h1>Welcome to the Personalized Movie Recommender</h1>
     
+    <h2>Start Rating Movies to Get Recommendations</h2>
+    <p><a href="{{ url_for('rate_movies') }}">Rate Movies</a></p>
+    
+    <hr>
+    
     <h2>Get Personalized Recommendations</h2>
     <form action="/personalized_recommend" method="post">
         <label for="user_id">Select a User ID:</label>

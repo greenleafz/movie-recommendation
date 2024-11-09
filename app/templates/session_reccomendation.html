@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Personalized Recommendations</title>
+</head>
+<body>
+    <h1>Your Personalized Recommendations</h1>
+    <ul>
+        {% for movie in recommendations %}
+        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
+        {% endfor %}
+    </ul>
+    <br>
+    <a href="{{ url_for('rate_movies') }}">Rate More Movies</a> | <a href="/">Back to Home</a>
+</body>
+</html>
