@@ -20,54 +20,86 @@
         .star-rating label:before {
             content: "★";
         }
-        .star-rating input[type="radio"]:checked ~ label {
-            color: gold;
-        }
+        .star-rating input[type="radio"]:checked ~ label,
         .star-rating label:hover,
         .star-rating label:hover ~ label {
             color: gold;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .navigation-buttons {
+            margin-top: 20px;
+        }
+        .navigation-buttons button {
+            padding: 10px 20px;
+            font-size: 1em;
+            margin-right: 10px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <h1>Rate Movies</h1>
+    
     {% if error_message %}
-        <p style="color: red;">{{ error_message }}</p>
+        <p class="error">{{ error_message }}</p>
     {% endif %}
+    
     {% if movies %}
-    <form method="post">
-        <table>
-            <tr>
-                <th>Movie</th>
-                <th>Rating</th>
-            </tr>
-            {% for movie in movies %}
-            <tr>
-                <td>{{ movie }}</td>
-                <td>
-                    <div class="star-rating">
-                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_5" value="5">
-                        <label for="movie_{{ loop.index }}_rating_5"></label>
-                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_4" value="4">
-                        <label for="movie_{{ loop.index }}_rating_4"></label>
-                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_3" value="3">
-                        <label for="movie_{{ loop.index }}_rating_3"></label>
-                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_2" value="2">
-                        <label for="movie_{{ loop.index }}_rating_2"></label>
-                        <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_1" value="1">
-                        <label for="movie_{{ loop.index }}_rating_1"></label>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-        <br>
-        <button type="submit" name="next">Next</button>
-        <button type="submit" name="done">Done</button>
-    </form>
+        <form method="post">
+            <table>
+                <tr>
+                    <th>Movie</th>
+                    <th>Rating</th>
+                </tr>
+                {% for movie in movies %}
+                <tr>
+                    <td>{{ movie }}</td>
+                    <td>
+                        <div class="star-rating">
+                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_5" value="5">
+                            <label for="movie_{{ loop.index }}_rating_5"></label>
+                            
+                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_4" value="4">
+                            <label for="movie_{{ loop.index }}_rating_4"></label>
+                            
+                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_3" value="3">
+                            <label for="movie_{{ loop.index }}_rating_3"></label>
+                            
+                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_2" value="2">
+                            <label for="movie_{{ loop.index }}_rating_2"></label>
+                            
+                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_1" value="1">
+                            <label for="movie_{{ loop.index }}_rating_1"></label>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            
+            <div class="navigation-buttons">
+                <button type="submit" name="action" value="next">Next</button>
+                <button type="submit" name="action" value="done">Done</button>
+            </div>
+        </form>
     {% else %}
         <p>No more movies to rate.</p>
     {% endif %}
+    
     <br>
     <a href="{{ url_for('reset_ratings') }}">Reset Ratings</a> | <a href="/">Back to Home</a>
 </body>
