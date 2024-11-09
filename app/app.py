@@ -111,6 +111,8 @@ def rate_movies():
         session['rated_movies'] = {}
         session['seen_movies'] = []
 
+    error_message = None  # Initialize error_message
+
     if request.method == 'POST':
         # Retrieve ratings from form
         for key, value in request.form.items():
@@ -122,15 +124,16 @@ def rate_movies():
                 if movie_title not in session['seen_movies']:
                     session['seen_movies'].append(movie_title)
 
-        # Check if 'done' button was clicked
-        if 'done' in request.form:
+        # Determine which button was clicked
+        action = request.form.get('action')
+        if action == 'done':
             if len(session['rated_movies']) >= 5:
                 # Generate recommendations
                 recommendations = generate_recommendations_from_ratings(session['rated_movies'])
                 return render_template('session_recommendations.html', recommendations=recommendations)
             else:
                 error_message = "Please rate at least 5 movies before proceeding."
-                return render_template('rate_movies.html', movies=[], error_message=error_message)
+                # Instead of changing pages, render the same page with an error message
 
     # Select movies to rate
     rated_movie_titles = session['seen_movies']
@@ -144,9 +147,10 @@ def rate_movies():
             return render_template('session_recommendations.html', recommendations=recommendations)
         else:
             error_message = "No more movies to rate. Please rate at least 5 movies."
+            # Render the same page with an error message
             return render_template('rate_movies.html', movies=[], error_message=error_message)
 
-    return render_template('rate_movies.html', movies=movies_to_rate, error_message=None)
+    return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
 
 # Route to reset ratings
 @app.route('/reset_ratings')
@@ -224,43 +228,54 @@ def recommend_movies(user_id, num_recommendations=10):
 
     return recommended_titles
 
-# Function to select movies for rating
+# Function to select movies for rating, influenced by previous ratings
 def select_movies_for_rating(rated_movie_titles):
     # Exclude movies already rated
     available_movie_indices = [idx for idx in range(len(movie_titles)) if movie_titles[idx] not in rated_movie_titles]
 
-    # If less than 5 movies are left, return them all
+    # If less than required movies are left, return them all
     if len(available_movie_indices) <= 5:
         selected_indices = available_movie_indices
     else:
-        # Randomly select movies based on specified criteria
-        selected_indices = []
-
-        # First movie: from top 25 movies
-        first_movie_idx = random.choice(available_movie_indices[:25])
-        selected_indices.append(first_movie_idx)
-
-        # Second movie: from 25-50
-        second_movie_idx = random.choice(available_movie_indices[25:50])
-        selected_indices.append(second_movie_idx)
-
-        # Third movie: from 50-100
-        third_movie_idx = random.choice(available_movie_indices[50:100])
-        selected_indices.append(third_movie_idx)
-
-        # Fourth movie: from 100-500
-        if len(available_movie_indices) >= 500:
-            fourth_movie_idx = random.choice(available_movie_indices[100:500])
+        # If user has rated movies, select new movies based on similarities
+        if session['rated_movies']:
+            rated_movies = list(session['rated_movies'].keys())
+            # Get indices of rated movies
+            rated_movie_indices = [movie_indices[movie] for movie in rated_movies if movie in movie_indices]
+            # Get user ratings
+            ratings = np.array([session['rated_movies'][movie] for movie in rated_movies])
+            # Compute weighted average vector of rated movies
+            rated_movie_vectors = svd_matrix[rated_movie_indices]
+            user_profile = np.dot(ratings, rated_movie_vectors) / np.sum(ratings)
+            # Compute similarities to all movies
+            cosine_sim = cosine_similarity(user_profile.reshape(1, -1), svd_matrix)[0]
+            # Exclude movies already seen
+            unseen_movie_indices = [idx for idx in available_movie_indices]
+            # Get similarities for unseen movies
+            unseen_similarities = [(idx, cosine_sim[idx]) for idx in unseen_movie_indices]
+            # Sort by similarity
+            unseen_similarities.sort(key=lambda x: x[1], reverse=True)
+            # Now, select movies based on bins
+            selected_indices = []
+            bins = [
+                (0, 50, 2),     # Top 50 most similar, pick 2 movies
+                (50, 100, 1),   # Ranks 51-100, pick 1 movie
+                (100, 200, 1),  # Ranks 101-200, pick 1 movie
+                (200, 500, 1)   # Ranks 201-500, pick 1 movie
+            ]
+            for start, end, num in bins:
+                # Ensure the indices are within the range
+                bin_movies = unseen_similarities[start:end]
+                if len(bin_movies) >= num:
+                    selected_bin_indices = random.sample(bin_movies, num)
+                else:
+                    selected_bin_indices = bin_movies  # Take whatever is available
+                selected_indices.extend([idx for idx, sim in selected_bin_indices])
+            # Shuffle the selected movies
+            random.shuffle(selected_indices)
         else:
-            fourth_movie_idx = random.choice(available_movie_indices[100:])
-        selected_indices.append(fourth_movie_idx)
-
-        # Fifth movie: from the 100 most dissimilar movies
-        fifth_movie_idx = random.choice(available_movie_indices[-100:])
-        selected_indices.append(fifth_movie_idx)
-
-        # Shuffle the selected movies
-        random.shuffle(selected_indices)
+            # If no ratings yet, select random movies
+            selected_indices = random.sample(available_movie_indices, 5)
 
     # Get movie titles
     selected_movies = [movie_titles[idx] for idx in selected_indices]
