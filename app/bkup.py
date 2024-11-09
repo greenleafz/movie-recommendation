@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, session
 import pickle
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
@@ -25,8 +24,15 @@ if isinstance(movie_titles, np.ndarray):
 # Create a mapping from movie titles to indices
 movie_indices = {title: idx for idx, title in enumerate(movie_titles)}
 
-# Load the NCF model and necessary data for personalized recommendations
-ncf_model = keras.models.load_model('./app/models/ncf_model.h5')
+# Load the TFLite model and necessary data for personalized recommendations
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path='./app/models/ncf_model_quantized.tflite')
+interpreter.allocate_tensors()
+
+# Get input and output tensors
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 with open('./app/models/user_id_to_idx.pkl', 'rb') as f:
     user_id_to_idx = pickle.load(f)
@@ -51,6 +57,18 @@ item_id_to_idx = {item_id: idx for idx, item_id in enumerate(item_ids)}
 # Get number of users and items
 num_users = len(user_ids)
 num_items = len(item_ids)
+
+# Define prediction function using TFLite model
+def predict_with_tflite(user_array, item_array):
+    interpreter.resize_tensor_input(input_details[0]['index'], [len(user_array)], strict=True)
+    interpreter.resize_tensor_input(input_details[1]['index'], [len(item_array)], strict=True)
+    interpreter.allocate_tensors()
+
+    interpreter.set_tensor(input_details[0]['index'], np.array(user_array, dtype=np.int32))
+    interpreter.set_tensor(input_details[1]['index'], np.array(item_array, dtype=np.int32))
+    interpreter.invoke()
+    predictions = interpreter.get_tensor(output_details[0]['index'])
+    return predictions
 
 # Home route
 @app.route('/')
@@ -180,7 +198,10 @@ def get_liked_movies(user_id, num_movies=10):
     liked_movies = user_data['title'].tolist()
     if num_movies > len(liked_movies):
         num_movies = len(liked_movies)
-    liked_movies = random.sample(liked_movies, num_movies)
+    if liked_movies:
+        liked_movies = random.sample(liked_movies, num_movies)
+    else:
+        liked_movies = []
     return liked_movies
 
 # Function to get movies a user disliked
@@ -189,7 +210,10 @@ def get_disliked_movies(user_id, num_movies=10):
     disliked_movies = user_data['title'].tolist()
     if num_movies > len(disliked_movies):
         num_movies = len(disliked_movies)
-    disliked_movies = random.sample(disliked_movies, num_movies)
+    if disliked_movies:
+        disliked_movies = random.sample(disliked_movies, num_movies)
+    else:
+        disliked_movies = []
     return disliked_movies
 
 # NCF-based recommendation function for existing users
@@ -208,10 +232,10 @@ def recommend_movies(user_id, num_recommendations=10):
     items_to_predict = list(all_items - interacted_items)
 
     # Predict interaction scores
-    user_array = np.full(len(items_to_predict), user_idx)
-    item_array = np.array(items_to_predict)
+    user_array = np.full(len(items_to_predict), user_idx, dtype=np.int32)
+    item_array = np.array(items_to_predict, dtype=np.int32)
 
-    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+    predictions = predict_with_tflite(user_array, item_array).flatten()
 
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
@@ -219,7 +243,7 @@ def recommend_movies(user_id, num_recommendations=10):
 
     # Map item indices to titles
     recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
-    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+    recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
 
     return recommended_titles
 
@@ -245,27 +269,33 @@ def select_movies_for_rating(rated_movie_titles):
         # Randomly select movies based on specified criteria
         selected_indices = []
 
+        # Ensure there are enough movies in each range
+        ranges = [
+            (0, min(25, len(available_movie_indices))),
+            (25, min(50, len(available_movie_indices))),
+            (50, min(100, len(available_movie_indices))),
+            (100, min(500, len(available_movie_indices))),
+            (-100, len(available_movie_indices))
+        ]
+
         # First movie: from top 25 movies
-        first_movie_idx = random.choice(available_movie_indices[:25])
+        first_movie_idx = random.choice(available_movie_indices[ranges[0][0]:ranges[0][1]])
         selected_indices.append(first_movie_idx)
 
         # Second movie: from 25-50
-        second_movie_idx = random.choice(available_movie_indices[25:50])
+        second_movie_idx = random.choice(available_movie_indices[ranges[1][0]:ranges[1][1]])
         selected_indices.append(second_movie_idx)
 
         # Third movie: from 50-100
-        third_movie_idx = random.choice(available_movie_indices[50:100])
+        third_movie_idx = random.choice(available_movie_indices[ranges[2][0]:ranges[2][1]])
         selected_indices.append(third_movie_idx)
 
         # Fourth movie: from 100-500
-        if len(available_movie_indices) >= 500:
-            fourth_movie_idx = random.choice(available_movie_indices[100:500])
-        else:
-            fourth_movie_idx = random.choice(available_movie_indices[100:])
+        fourth_movie_idx = random.choice(available_movie_indices[ranges[3][0]:ranges[3][1]])
         selected_indices.append(fourth_movie_idx)
 
         # Fifth movie: from the 100 most dissimilar movies
-        fifth_movie_idx = random.choice(available_movie_indices[-100:])
+        fifth_movie_idx = random.choice(available_movie_indices[ranges[4][0]:ranges[4][1]])
         selected_indices.append(fifth_movie_idx)
 
         # Shuffle the selected movies
@@ -288,9 +318,6 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     user_ratings_df['item_idx'] = [item_id_to_idx.get(movie_indices[movie]) for movie in user_ratings.keys()]
     user_ratings_df['title'] = user_ratings_df['item_id'].map(item_id_to_title)
 
-    # Combine with existing data
-    combined_data = pd.concat([data, user_ratings_df], ignore_index=True)
-
     # Generate recommendations
     user_idx = len(user_id_to_idx)  # Index for the new user
 
@@ -302,10 +329,10 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
     items_to_predict = list(all_items - interacted_items)
 
     # Predict interaction scores
-    user_array = np.full(len(items_to_predict), user_idx)
-    item_array = np.array(items_to_predict)
+    user_array = np.full(len(items_to_predict), user_idx, dtype=np.int32)
+    item_array = np.array(items_to_predict, dtype=np.int32)
 
-    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+    predictions = predict_with_tflite(user_array, item_array).flatten()
 
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
@@ -313,7 +340,7 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
 
     # Map item indices to titles
     recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
-    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+    recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
 
     return recommended_titles
 
