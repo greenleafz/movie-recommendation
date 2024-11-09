@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Generate secret key programmatically
+app.secret_key = os.environ.get('SECRET_KEY')
 
 # Load the SVD matrix and movie titles for SVD recommendations
 with open('./app/models/svd_matrix.pkl', 'rb') as f:
