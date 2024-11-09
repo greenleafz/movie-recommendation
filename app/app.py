@@ -109,7 +109,7 @@ def personalized_recommend():
 def rate_movies():
     if 'rated_movies' not in session:
         session['rated_movies'] = {}
-        session['seen_movies'] = set()
+        session['seen_movies'] = []
 
     if request.method == 'POST':
         # Retrieve ratings from form
@@ -118,7 +118,9 @@ def rate_movies():
                 movie_title = key.replace('movie_', '')
                 rating = int(value)
                 session['rated_movies'][movie_title] = rating
-                session['seen_movies'].add(movie_title)
+                if movie_title not in session['seen_movies']:
+                    session['seen_movies'].append(movie_title)
+
 
         # Check if 'done' button was clicked
         if 'done' in request.form:
