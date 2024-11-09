@@ -9,6 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 from flask_session import Session
 import redis
+import ssl
+
 
 app = Flask(__name__)
 
