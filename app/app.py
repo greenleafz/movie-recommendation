@@ -1,4 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
+from flask_session import Session
+from flask_sqlalchemy import SQLAlchemy
+import os
 import pickle
 import numpy as np
 import tensorflow as tf
@@ -6,24 +9,33 @@ from tensorflow import keras
 import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-import os
-from flask_session import Session
-import redis
-import ssl
-
 
 app = Flask(__name__)
 
 # Load the secret key from an environment variable or set a default
 app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
 
-# Configure server-side sessions with Redis
-app.config['SESSION_TYPE'] = 'redis'
-app.config['SESSION_REDIS'] = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:6379'))
+# Configure the database URI
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configure session to use the database
+app.config['SESSION_TYPE'] = 'sqlalchemy'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 
+# Initialize extensions
+db = SQLAlchemy(app)
+app.config['SESSION_SQLALCHEMY'] = db
+
+# Set the session table name (optional)
+app.config['SESSION_SQLALCHEMY_TABLE'] = 'sessions'
+
 Session(app)
+
+# Create the database tables
+with app.app_context():
+    db.create_all()
 
 # Load the SVD matrix and movie titles for SVD recommendations
 with open('./app/models/svd_matrix.pkl', 'rb') as f:
@@ -154,22 +166,29 @@ def rate_movies():
                 error_message = "Please rate at least 5 movies before proceeding."
                 # Instead of changing pages, render the same page with an error message
 
-    # Select movies to rate
-    rated_movie_titles = session.get('seen_movies', [])
-    movies_to_rate = select_movies_for_rating(rated_movie_titles)
+        # Continue to next set of movies or show error
+        # Select movies to rate
+        rated_movie_titles = session.get('seen_movies', [])
+        movies_to_rate = select_movies_for_rating(rated_movie_titles)
 
-    # If no more movies to rate
-    if not movies_to_rate:
-        if len(session.get('rated_movies', {})) >= 5:
-            # Generate recommendations
-            recommendations = generate_recommendations_from_ratings(session['rated_movies'])
-            return render_template('session_recommendations.html', recommendations=recommendations)
-        else:
-            error_message = "No more movies to rate. Please rate at least 5 movies."
-            # Render the same page with an error message
-            return render_template('rate_movies.html', movies=[], error_message=error_message)
+        # If no more movies to rate
+        if not movies_to_rate:
+            if len(session.get('rated_movies', {})) >= 5:
+                # Generate recommendations
+                recommendations = generate_recommendations_from_ratings(session['rated_movies'])
+                return render_template('session_recommendations.html', recommendations=recommendations)
+            else:
+                error_message = "No more movies to rate. Please rate at least 5 movies."
+                # Render the same page with an error message
+                return render_template('rate_movies.html', movies=[], error_message=error_message)
 
-    return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
+        return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
+
+    else:
+        # GET request, display movies to rate
+        rated_movie_titles = session.get('seen_movies', [])
+        movies_to_rate = select_movies_for_rating(rated_movie_titles)
+        return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
 
 # Route to reset ratings
 @app.route('/reset_ratings')
@@ -305,38 +324,32 @@ def select_movies_for_rating(rated_movie_titles=None):
 
 # Function to generate recommendations from user ratings
 def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
-    # Assign a new user index for the session user
-    session_user_idx = num_users  # Use an index beyond existing users
-
     # Prepare item indices and ratings
     item_idxs = []
-    ratings = []
+    ratings_list = []
     for movie_title, rating in user_ratings.items():
         if movie_title in movie_indices:
             movie_idx = movie_indices[movie_title]
             item_idxs.append(movie_idx)
-            ratings.append(rating)
+            ratings_list.append(rating)
 
-    # Items the user has interacted with
-    interacted_items = set(item_idxs)
+    if not item_idxs:
+        return []
 
-    # Items not yet interacted with
-    all_items = set(range(num_items))
-    items_to_predict = list(all_items - interacted_items)
+    # Generate user embedding based on rated movies
+    item_embedding_layer = ncf_model.get_layer('item_embedding')
+    item_embeddings = item_embedding_layer.get_weights()[0]
+    user_vector = np.average(item_embeddings[item_idxs], axis=0, weights=ratings_list)
 
-    # Predict interaction scores
-    user_array = np.full(len(items_to_predict), session_user_idx)
-    item_array = np.array(items_to_predict)
+    # Compute scores for all items
+    scores = np.dot(item_embeddings, user_vector)
 
-    # Predict
-    predictions = ncf_model.predict([user_array, item_array], batch_size=32).flatten()
+    # Exclude items already rated
+    scores[item_idxs] = -np.inf
 
     # Get top N items
-    top_indices = predictions.argsort()[-num_recommendations:][::-1]
-    recommended_item_idxs = [items_to_predict[i] for i in top_indices]
-
-    # Map item indices to titles
-    recommended_titles = [movie_titles[idx] for idx in recommended_item_idxs]
+    top_indices = np.argsort(scores)[-num_recommendations:][::-1]
+    recommended_titles = [movie_titles[idx] for idx in top_indices]
 
     return recommended_titles
 

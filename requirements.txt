@@ -4,6 +4,7 @@ click==8.1.7
 colorama==0.4.6
 Flask==3.0.3
 Flask-Session==0.8.0
+Flask-SQLAlchemy==3.1.1
 flatbuffers==24.3.25
 gunicorn==23.0.0
 itsdangerous==2.2.0
