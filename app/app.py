@@ -58,6 +58,10 @@ movie_indices = {title: idx for idx, title in enumerate(movie_titles)}
 # Load the NCF model and necessary data for personalized recommendations
 ncf_model = keras.models.load_model('./app/models/ncf_model.h5')
 
+# Print all layer names in the model to find the item embedding layer
+for layer in ncf_model.layers:
+    print(layer.name)
+
 with open('./app/models/user_id_to_idx.pkl', 'rb') as f:
     user_id_to_idx = pickle.load(f)
 
@@ -341,7 +345,7 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
         return []
 
     # Generate user embedding based on rated movies
-    item_embedding_layer = ncf_model.get_layer('item_embedding')
+    item_embedding_layer = ncf_model.get_layer('embedding_1')
     item_embeddings = item_embedding_layer.get_weights()[0]
     user_vector = np.average(item_embeddings[item_idxs], axis=0, weights=ratings_list)
 
