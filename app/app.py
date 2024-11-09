@@ -195,15 +195,15 @@ def get_disliked_movies(user_id, num_movies=10):
 # NCF-based recommendation function for existing users
 def recommend_movies(user_id, num_recommendations=10):
     user_idx = user_id_to_idx.get(user_id)
-    if user_idx is None:
-        print("User ID not found.")
+    if user_idx is None or user_idx >= num_users:
+        print("User ID not found or out of range.")
         return []
 
     # Items the user has interacted with
     user_data = data[data['user_idx'] == user_idx]
     interacted_items = set(user_data['item_idx'].tolist())
 
-    # Items not yet interacted with
+    # Filter items that are out of the range for item indices
     all_items = set(range(num_items))
     items_to_predict = list(all_items - interacted_items)
 
@@ -211,7 +211,8 @@ def recommend_movies(user_id, num_recommendations=10):
     user_array = np.full(len(items_to_predict), user_idx)
     item_array = np.array(items_to_predict)
 
-    predictions = ncf_model.predict([user_array, item_array], batch_size=1024).flatten()
+    # Predict
+    predictions = ncf_model.predict([user_array, item_array], batch_size=128).flatten()
 
     # Get top N items
     top_indices = predictions.argsort()[-num_recommendations:][::-1]
@@ -219,9 +220,10 @@ def recommend_movies(user_id, num_recommendations=10):
 
     # Map item indices to titles
     recommended_item_ids = [item_idx_to_id[idx] for idx in recommended_item_idxs]
-    recommended_titles = [item_id_to_title[item_id] for item_id in recommended_item_ids]
+    recommended_titles = [item_id_to_title.get(item_id, 'Unknown') for item_id in recommended_item_ids]
 
     return recommended_titles
+
 
 # Function to get similar movie indices
 def get_similar_movie_indices(movie_name):
