@@ -3,31 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <title>Personalized Recommendations for User {{ user_id }}</title>
+    <style>
+        /* Add styling for movie posters */
+        .movie {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        .movie img {
+            width: 150px;
+            height: 225px;
+        }
+    </style>
 </head>
 <body>
     <h1>Personalized Recommendations for User {{ user_id }}</h1>
-    
+
     <h3>Movies They Liked:</h3>
-    <ul>
+    <div class="movies">
         {% for movie in liked_movies %}
-        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
+        <div class="movie">
+            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
+                <p>{{ movie.title }}</p>
+            </a>
+        </div>
         {% endfor %}
-    </ul>
-    
+    </div>
+
     <h3>Movies They Didn't Like:</h3>
-    <ul>
+    <div class="movies">
         {% for movie in disliked_movies %}
-        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
+        <div class="movie">
+            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
+                <p>{{ movie.title }}</p>
+            </a>
+        </div>
         {% endfor %}
-    </ul>
-    
+    </div>
+
     <h3>Recommended Movies They Might Like:</h3>
-    <ul>
+    <div class="movies">
         {% for movie in recommendations %}
-        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
+        <div class="movie">
+            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
+                <p>{{ movie.title }}</p>
+            </a>
+        </div>
         {% endfor %}
-    </ul>
-    
+    </div>
+
     <a href="/">Back to Home</a>
 </body>
 </html>

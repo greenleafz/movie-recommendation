@@ -3,16 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <title>Similar Movies to {{ movie_name }}</title>
+    <style>
+        /* Add styling for movie posters */
+        .movie {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        .movie img {
+            width: 150px;
+            height: 225px;
+        }
+    </style>
 </head>
 <body>
     <h1>Movies Similar to "{{ movie_name }}"</h1>
-    
-    <ul>
+
+    <div class="movies">
         {% for movie in recommendations %}
-        <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
+        <div class="movie">
+            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
+                <p>{{ movie.title }}</p>
+            </a>
+        </div>
         {% endfor %}
-    </ul>
-    
+    </div>
+
     <a href="/">Back to Home</a>
 </body>
 </html>

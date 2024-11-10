@@ -9,6 +9,7 @@ from tensorflow import keras
 import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+import requests  # Added to handle API requests
 
 app = Flask(__name__)
 
@@ -16,7 +17,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key')
 
 # Adjust DATABASE_URL to be compatible with SQLAlchemy
-uri = os.environ.get("DATABASE_URL", "sqlite:///local.db")  # Get the database URL from environment
+uri = os.environ.get("DATABASE_URL", "sqlite:///local.db")
 if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 
@@ -58,10 +59,6 @@ movie_indices = {title: idx for idx, title in enumerate(movie_titles)}
 # Load the NCF model and necessary data for personalized recommendations
 ncf_model = keras.models.load_model('./app/models/ncf_model.h5')
 
-# Print all layer names in the model to find the item embedding layer
-for layer in ncf_model.layers:
-    print(layer.name)
-
 with open('./app/models/user_id_to_idx.pkl', 'rb') as f:
     user_id_to_idx = pickle.load(f)
 
@@ -86,6 +83,32 @@ item_id_to_idx = {item_id: idx for idx, item_id in enumerate(item_ids)}
 num_users = len(user_ids)
 num_items = len(item_ids)
 
+# TMDb API key from environment variable
+TMDB_API_KEY = os.environ.get('TMDB_API_KEY')
+
+# Function to get movie poster URL using TMDb API
+def get_movie_poster_url(movie_title):
+    if not TMDB_API_KEY:
+        print("TMDB_API_KEY is missing")
+        return None
+
+    search_url = "https://api.themoviedb.org/3/search/movie"
+    params = {
+        'api_key': TMDB_API_KEY,
+        'query': movie_title,
+        'include_adult': 'false',
+        'language': 'en-US',
+    }
+    response = requests.get(search_url, params=params)
+    data = response.json()
+
+    # Check if results were found
+    if data['results']:
+        poster_path = data['results'][0].get('poster_path')
+        if poster_path:
+            return f"https://image.tmdb.org/t/p/w500{poster_path}"
+    return None  # Return None if no poster is found
+
 # Home route
 @app.route('/')
 def home():
@@ -103,14 +126,23 @@ def recommend():
 
     # Get recommendations
     recommendations = get_similar_movies_svd(selected_movie, num_recommendations)
-    return render_template('recommendations.html', movie_name=selected_movie, recommendations=recommendations)
+
+    # Get posters for recommended movies
+    recommended_movies_with_posters = []
+    for movie in recommendations:
+        poster_url = get_movie_poster_url(movie)
+        recommended_movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'
+        })
+
+    return render_template('recommendations.html', movie_name=selected_movie, recommendations=recommended_movies_with_posters)
 
 # Route for similar movies
 @app.route('/similar_movies/<movie_name>')
 def similar_movies(movie_name):
     num_recommendations = 5  # Number of similar movies to show
 
-    # Check if the movie exists in the indices
     if movie_name not in movie_indices:
         error_message = "Movie not found in the database."
         return render_template('recommendations.html', error_message=error_message)
@@ -118,7 +150,16 @@ def similar_movies(movie_name):
     # Get similar movies
     recommendations = get_similar_movies_svd(movie_name, num_recommendations)
 
-    return render_template('similar_movies.html', movie_name=movie_name, recommendations=recommendations)
+    # Get posters for recommended movies
+    recommended_movies_with_posters = []
+    for movie in recommendations:
+        poster_url = get_movie_poster_url(movie)
+        recommended_movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'
+        })
+
+    return render_template('similar_movies.html', movie_name=movie_name, recommendations=recommended_movies_with_posters)
 
 # Route for NCF-based personalized recommendations
 @app.route('/personalized_recommend', methods=['POST'])
@@ -130,12 +171,37 @@ def personalized_recommend():
     disliked_movies = get_disliked_movies(selected_user_id, num_movies=5)
     recommendations = recommend_movies(selected_user_id, num_recommendations)
 
+    # Get posters for liked, disliked, and recommended movies
+    liked_movies_with_posters = []
+    for movie in liked_movies:
+        poster_url = get_movie_poster_url(movie)
+        liked_movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'
+        })
+
+    disliked_movies_with_posters = []
+    for movie in disliked_movies:
+        poster_url = get_movie_poster_url(movie)
+        disliked_movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'
+        })
+
+    recommended_movies_with_posters = []
+    for movie in recommendations:
+        poster_url = get_movie_poster_url(movie)
+        recommended_movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'
+        })
+
     return render_template(
         'personalized_recommendations.html',
         user_id=selected_user_id,
-        liked_movies=liked_movies,
-        disliked_movies=disliked_movies,
-        recommendations=recommendations
+        liked_movies=liked_movies_with_posters,
+        disliked_movies=disliked_movies_with_posters,
+        recommendations=recommended_movies_with_posters
     )
 
 # Route to start rating movies
@@ -169,25 +235,42 @@ def rate_movies():
             if len(session.get('rated_movies', {})) >= 5:
                 # Generate recommendations
                 recommendations = generate_recommendations_from_ratings(session['rated_movies'])
-                return render_template('session_recommendations.html', recommendations=recommendations)
+
+                # Get posters for recommended movies
+                recommended_movies_with_posters = []
+                for movie in recommendations:
+                    poster_url = get_movie_poster_url(movie)
+                    recommended_movies_with_posters.append({
+                        'title': movie,
+                        'poster_url': poster_url or 'default_poster.jpg'
+                    })
+
+                return render_template('session_recommendations.html', recommendations=recommended_movies_with_posters)
             else:
                 error_message = "Please rate at least 5 movies before proceeding."
-                # Instead of changing pages, render the same page with an error message
 
         # Continue to next set of movies or show error
-        # Select movies to rate
         rated_movie_titles = session.get('seen_movies', [])
-        movies_to_rate = select_movies_for_rating(rated_movie_titles)
+        movies_to_rate = select_movies_for_rating_with_posters(rated_movie_titles)
 
         # If no more movies to rate
         if not movies_to_rate:
             if len(session.get('rated_movies', {})) >= 5:
                 # Generate recommendations
                 recommendations = generate_recommendations_from_ratings(session['rated_movies'])
-                return render_template('session_recommendations.html', recommendations=recommendations)
+
+                # Get posters for recommended movies
+                recommended_movies_with_posters = []
+                for movie in recommendations:
+                    poster_url = get_movie_poster_url(movie)
+                    recommended_movies_with_posters.append({
+                        'title': movie,
+                        'poster_url': poster_url or 'default_poster.jpg'
+                    })
+
+                return render_template('session_recommendations.html', recommendations=recommended_movies_with_posters)
             else:
                 error_message = "No more movies to rate. Please rate at least 5 movies."
-                # Render the same page with an error message
                 return render_template('rate_movies.html', movies=[], error_message=error_message)
 
         return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
@@ -195,7 +278,7 @@ def rate_movies():
     else:
         # GET request, display movies to rate
         rated_movie_titles = session.get('seen_movies', [])
-        movies_to_rate = select_movies_for_rating(rated_movie_titles)
+        movies_to_rate = select_movies_for_rating_with_posters(rated_movie_titles)
         return render_template('rate_movies.html', movies=movies_to_rate, error_message=error_message)
 
 # Route to reset ratings
@@ -274,7 +357,22 @@ def recommend_movies(user_id, num_recommendations=10):
 
     return recommended_titles
 
-# Function to select movies for rating, influenced by previous ratings
+# Function to select movies for rating, now with poster URLs
+def select_movies_for_rating_with_posters(rated_movie_titles=None):
+    selected_movies = select_movies_for_rating(rated_movie_titles)
+
+    # Get movie posters
+    movies_with_posters = []
+    for movie in selected_movies:
+        poster_url = get_movie_poster_url(movie)
+        movies_with_posters.append({
+            'title': movie,
+            'poster_url': poster_url or 'default_poster.jpg'  # Use a default image if no poster found
+        })
+
+    return movies_with_posters
+
+# Original function to select movies for rating
 def select_movies_for_rating(rated_movie_titles=None):
     if rated_movie_titles is None:
         rated_movie_titles = []

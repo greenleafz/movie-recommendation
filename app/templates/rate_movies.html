@@ -8,6 +8,16 @@
             font-family: Arial, sans-serif;
             margin: 20px;
         }
+        .movie {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .movie img {
+            width: 100px;
+            margin-right: 20px;
+            border-radius: 5px;
+        }
         .star-rating {
             direction: rtl;
             font-size: 1.5em;
@@ -31,19 +41,6 @@
             color: red;
             margin-top: 10px;
             font-weight: bold;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            padding: 10px 15px;
-            border-bottom: 1px solid #ddd;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
         }
         .navigation-buttons {
             margin-top: 20px;
@@ -100,35 +97,30 @@
     <!-- Movie Rating Form -->
     {% if movies %}
         <form method="post">
-            <table>
-                <tr>
-                    <th>Movie</th>
-                    <th>Rating</th>
-                </tr>
-                {% for movie in movies %}
-                <tr>
-                    <td>{{ movie }}</td>
-                    <td>
-                        <div class="star-rating">
-                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_5" value="5">
-                            <label for="movie_{{ loop.index }}_rating_5" title="5 stars">&#9733;</label>
-                            
-                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_4" value="4">
-                            <label for="movie_{{ loop.index }}_rating_4" title="4 stars">&#9733;</label>
-                            
-                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_3" value="3">
-                            <label for="movie_{{ loop.index }}_rating_3" title="3 stars">&#9733;</label>
-                            
-                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_2" value="2">
-                            <label for="movie_{{ loop.index }}_rating_2" title="2 stars">&#9733;</label>
-                            
-                            <input type="radio" name="movie_{{ movie }}" id="movie_{{ loop.index }}_rating_1" value="1">
-                            <label for="movie_{{ loop.index }}_rating_1" title="1 star">&#9733;</label>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
+            {% for movie in movies %}
+            <div class="movie">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
+                <div>
+                    <p><strong>{{ movie.title }}</strong></p>
+                    <div class="star-rating">
+                        <input type="radio" name="movie_{{ movie.title }}" id="movie_{{ loop.index }}_rating_5" value="5">
+                        <label for="movie_{{ loop.index }}_rating_5" title="5 stars">&#9733;</label>
+                        
+                        <input type="radio" name="movie_{{ movie.title }}" id="movie_{{ loop.index }}_rating_4" value="4">
+                        <label for="movie_{{ loop.index }}_rating_4" title="4 stars">&#9733;</label>
+                        
+                        <input type="radio" name="movie_{{ movie.title }}" id="movie_{{ loop.index }}_rating_3" value="3">
+                        <label for="movie_{{ loop.index }}_rating_3" title="3 stars">&#9733;</label>
+                        
+                        <input type="radio" name="movie_{{ movie.title }}" id="movie_{{ loop.index }}_rating_2" value="2">
+                        <label for="movie_{{ loop.index }}_rating_2" title="2 stars">&#9733;</label>
+                        
+                        <input type="radio" name="movie_{{ movie.title }}" id="movie_{{ loop.index }}_rating_1" value="1">
+                        <label for="movie_{{ loop.index }}_rating_1" title="1 star">&#9733;</label>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
             
             <div class="navigation-buttons">
                 <button type="submit" name="action" value="next">Next</button>
