@@ -400,14 +400,15 @@ def select_movies_for_rating_with_posters(rated_movie_titles=None):
     return movies_with_posters
 
 # Original function to select movies for rating
+# Original function to select movies for rating
 def select_movies_for_rating(rated_movie_titles=None):
     if rated_movie_titles is None:
         rated_movie_titles = []
     # Exclude movies already rated
     available_movie_indices = [idx for idx in range(len(movie_titles)) if movie_titles[idx] not in rated_movie_titles]
 
-    # If less than required movies are left, return them all
-    if len(available_movie_indices) <= 5:
+    # If less than 6 movies are left, return them all
+    if len(available_movie_indices) <= 6:
         selected_indices = available_movie_indices
     else:
         # If user has rated movies, select new movies based on similarities
@@ -432,7 +433,7 @@ def select_movies_for_rating(rated_movie_titles=None):
             selected_indices = []
             bins = [
                 (0, 50, 2),     # Top 50 most similar, pick 2 movies
-                (50, 100, 1),   # Ranks 51-100, pick 1 movie
+                (50, 100, 2),   # Ranks 51-100, pick 1 movie
                 (100, 200, 1),  # Ranks 101-200, pick 1 movie
                 (200, 500, 1)   # Ranks 201-500, pick 1 movie
             ]
@@ -447,13 +448,14 @@ def select_movies_for_rating(rated_movie_titles=None):
             # Shuffle the selected movies
             random.shuffle(selected_indices)
         else:
-            # If no ratings yet, select random movies
-            selected_indices = random.sample(available_movie_indices, 5)
+            # If no ratings yet, select 6 random movies
+            selected_indices = random.sample(available_movie_indices, 6)
 
     # Get movie titles
     selected_movies = [movie_titles[idx] for idx in selected_indices]
 
     return selected_movies
+
 
 # Function to generate recommendations from user ratings
 def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
