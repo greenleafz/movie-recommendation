@@ -117,14 +117,24 @@ def get_movie_poster_url(movie_title):
 
     # Clean the movie title before searching
     cleaned_title = clean_movie_title(movie_title)
-    data = fetch_poster_from_tmdb(cleaned_title)
+    print(f"Original title: '{movie_title}' | Cleaned title: '{cleaned_title}'")  # Log titles
 
-    # Check if results were found
-    if data.get('results'):
-        poster_path = data['results'][0].get('poster_path')
-        if poster_path:
-            return f"https://image.tmdb.org/t/p/w500{poster_path}"
-    return None  # Return None if no poster is found
+    try:
+        data = fetch_poster_from_tmdb(cleaned_title)
+        print(f"API response for '{cleaned_title}': {data}")  # Log API response
+
+        # Check if results were found
+        if data.get('results'):
+            poster_path = data['results'][0].get('poster_path')
+            if poster_path:
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}"
+                print(f"Poster URL found: {poster_url}")
+                return poster_url
+        print(f"No poster found for '{cleaned_title}'")
+        return None  # Return None if no poster is found
+    except Exception as e:
+        print(f"Error fetching poster for '{cleaned_title}': {e}")
+        return None
 
 # Home route
 @app.route('/')
