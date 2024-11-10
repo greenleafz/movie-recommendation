@@ -486,5 +486,12 @@ def generate_recommendations_from_ratings(user_ratings, num_recommendations=10):
 
     return recommended_titles
 
+@app.route('/test_poster')
+def test_poster():
+    test_title = 'Inception (2010)'
+    poster_url = get_movie_poster_url(test_title)
+    return f"Poster URL for '{test_title}': {poster_url}"
+
+
 if __name__ == '__main__':
     app.run(debug=True)
