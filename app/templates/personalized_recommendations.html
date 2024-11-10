@@ -1,60 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Personalized Recommendations for User {{ user_id }}</title>
-    <style>
-        /* Add styling for movie posters */
-        .movie {
-            display: inline-block;
-            margin: 10px;
-            text-align: center;
-        }
-        .movie img {
-            width: 150px;
-            height: 225px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Personalized Recommendations for User {{ user_id }}</h1>
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mb-4">Personalized Recommendations for User {{ user_id }}</h1>
 
-    <h3>Movies They Liked:</h3>
-    <div class="movies">
-        {% for movie in liked_movies %}
-        <div class="movie">
-            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
-                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
-                <p>{{ movie.title }}</p>
-            </a>
+<h3>Movies You Liked:</h3>
+<div class="row">
+    {% for movie in liked_movies %}
+    <div class="col-md-3 col-sm-6 mb-4">
+        <div class="card">
+            <img src="{{ movie.poster_url }}" class="card-img-top" alt="{{ movie.title }} poster">
+            <div class="card-body text-center">
+                <h5 class="card-title">{{ movie.title }}</h5>
+                <a href="{{ url_for('similar_movies', movie_name=movie.title) }}" class="btn btn-primary btn-sm">Find Similar</a>
+            </div>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
+</div>
 
-    <h3>Movies They Didn't Like:</h3>
-    <div class="movies">
-        {% for movie in disliked_movies %}
-        <div class="movie">
-            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
-                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
-                <p>{{ movie.title }}</p>
-            </a>
+<h3>Movies You Didn't Like:</h3>
+<div class="row">
+    {% for movie in disliked_movies %}
+    <div class="col-md-3 col-sm-6 mb-4">
+        <div class="card">
+            <img src="{{ movie.poster_url }}" class="card-img-top" alt="{{ movie.title }} poster">
+            <div class="card-body text-center">
+                <h5 class="card-title">{{ movie.title }}</h5>
+                <a href="{{ url_for('similar_movies', movie_name=movie.title) }}" class="btn btn-secondary btn-sm">Find Similar</a>
+            </div>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
+</div>
 
-    <h3>Recommended Movies They Might Like:</h3>
-    <div class="movies">
-        {% for movie in recommendations %}
-        <div class="movie">
-            <a href="{{ url_for('similar_movies', movie_name=movie.title) }}">
-                <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster">
-                <p>{{ movie.title }}</p>
-            </a>
+<h3>Recommended Movies You Might Like:</h3>
+<div class="row">
+    {% for movie in recommendations %}
+    <div class="col-md-3 col-sm-6 mb-4">
+        <div class="card">
+            <img src="{{ movie.poster_url }}" class="card-img-top" alt="{{ movie.title }} poster">
+            <div class="card-body text-center">
+                <h5 class="card-title">{{ movie.title }}</h5>
+                <a href="{{ url_for('similar_movies', movie_name=movie.title) }}" class="btn btn-success btn-sm">Find Similar</a>
+            </div>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
+</div>
 
-    <a href="/">Back to Home</a>
-</body>
-</html>
+<a href="{{ url_for('home') }}" class="btn btn-link">Back to Home</a>
+{% endblock %}

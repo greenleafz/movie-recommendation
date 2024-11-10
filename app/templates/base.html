@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title | default('Movie Recommender') }}</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <!-- Custom CSS (if any) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="{{ url_for('home') }}">Movie Recommender</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            {% if session.get('rated_movies') %}
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('rate_movies') }}">Rate More Movies</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('reset_ratings') }}">Reset Ratings</a>
+                </li>
+            </ul>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS and dependencies (Optional, if you use Bootstrap JS components) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+</body>
+</html>

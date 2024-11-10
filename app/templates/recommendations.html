@@ -1,22 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Recommendations for {{ movie_name }}</title>
-</head>
-<body>
-    <h1>Recommendations for "{{ movie_name }}"</h1>
-    
-    {% if error_message %}
-        <p>{{ error_message }}</p>
-    {% else %}
-        <ul>
-            {% for movie in recommendations %}
-            <li><a href="{{ url_for('similar_movies', movie_name=movie) }}">{{ movie }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    
-    <a href="/">Back to Home</a>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+<h1>Recommendations for "{{ movie_name }}"</h1>
+
+{% if error_message %}
+    <div class="alert alert-danger">
+        {{ error_message }}
+    </div>
+{% else %}
+    <div class="row">
+        {% for movie in recommendations %}
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="card">
+                <img src="{{ movie.poster_url }}" class="card-img-top" alt="{{ movie.title }} poster">
+                <div class="card-body text-center">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <a href="{{ url_for('similar_movies', movie_name=movie.title) }}" class="btn btn-primary btn-sm">Find Similar</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<a href="{{ url_for('home') }}" class="btn btn-link">Back to Home</a>
+{% endblock %}

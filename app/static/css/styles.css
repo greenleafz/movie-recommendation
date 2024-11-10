@@ -1,0 +1,21 @@
+/* Custom styles */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.card-img-top {
+    height: 350px;
+    object-fit: cover;
+}
+
+.card-title {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.btn-link {
+    padding: 0;
+    font-weight: 400;
+    color: #007bff;
+}
