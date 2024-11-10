@@ -9,7 +9,8 @@ from tensorflow import keras
 import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-import requests  # Added to handle API requests
+import requests
+import re  # Import regular expressions module for cleaning titles
 
 app = Flask(__name__)
 
@@ -84,14 +85,19 @@ num_users = len(user_ids)
 num_items = len(item_ids)
 
 # TMDb API key from environment variable
-TMDB_API_KEY = os.environ.get('TMDB_API_KEY')
+TMDB_API_KEY = os.environ.get('TMDB_API_KEY', 'your_default_api_key')  # Ensure a default is set
 
-# Function to get movie poster URL using TMDb API
-def get_movie_poster_url(movie_title):
-    if not TMDB_API_KEY:
-        print("TMDB_API_KEY is missing")
-        return None
+# Function to clean movie titles by removing release dates or extra info
+def clean_movie_title(movie_title):
+    # Use regex to remove text in parentheses or brackets
+    cleaned_title = re.sub(r'\s*\(.*?\)\s*', '', movie_title)
+    cleaned_title = re.sub(r'\s*\[.*?\]\s*', '', cleaned_title)
+    # Remove trailing and leading whitespace
+    cleaned_title = cleaned_title.strip()
+    return cleaned_title
 
+# Function to perform the TMDb API request
+def fetch_poster_from_tmdb(movie_title):
     search_url = "https://api.themoviedb.org/3/search/movie"
     params = {
         'api_key': TMDB_API_KEY,
@@ -101,9 +107,20 @@ def get_movie_poster_url(movie_title):
     }
     response = requests.get(search_url, params=params)
     data = response.json()
+    return data
+
+# Function to get movie poster URL using TMDb API
+def get_movie_poster_url(movie_title):
+    if not TMDB_API_KEY:
+        print("TMDB_API_KEY is missing")
+        return None
+
+    # Clean the movie title before searching
+    cleaned_title = clean_movie_title(movie_title)
+    data = fetch_poster_from_tmdb(cleaned_title)
 
     # Check if results were found
-    if data['results']:
+    if data.get('results'):
         poster_path = data['results'][0].get('poster_path')
         if poster_path:
             return f"https://image.tmdb.org/t/p/w500{poster_path}"
